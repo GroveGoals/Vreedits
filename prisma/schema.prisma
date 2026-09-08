@@ -54,6 +54,7 @@ model User {
   studyRoomMessages    StudyRoomMessage[] @relation("StudyRoomMessages")
   tutorConversations   TutorConversation[]
   clients              Client[]
+  projects             Project[]
 }
 
 model Follow {
@@ -450,6 +451,7 @@ model Client {
   createdAt DateTime @default(now())
   notes     Note[]
 }
+
 model Project {
   id     String @id @default(uuid())
   userId String
