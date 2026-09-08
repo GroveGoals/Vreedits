@@ -26,6 +26,26 @@ export default function MarkdownText({ text }) {
           border-radius: 4px;
           font-size: 13px;
         }
+        .vreedits-markdown pre {
+          background: #1a1a1e;
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 14px;
+          margin: 10px 0;
+          overflow-x: auto;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .vreedits-markdown pre code {
+          background: none;
+          padding: 0;
+          border-radius: 0;
+          font-size: 13px;
+          line-height: 1.5;
+          white-space: pre;
+          color: #e4e4e7;
+          font-family: "SF Mono", "Menlo", "Consolas", monospace;
+        }
       `}</style>
       <ReactMarkdown>{text}</ReactMarkdown>
     </div>
