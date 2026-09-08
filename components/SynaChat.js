@@ -104,7 +104,7 @@ function MessageActions({ text }) {
   };
 
   return (
-    <div className="flex items-center gap-1" style={{ marginTop: 6 }}>
+    <div className="flex items-center gap-1" style={{ marginTop: 8 }}>
       <button onClick={handleCopy} style={btnStyle} aria-label="Copy">
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
@@ -408,14 +408,6 @@ function SynaChatInner() {
 
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "var(--surface)" }}>
-      <style>{`
-        .syna-bubble::-webkit-scrollbar { width: 5px; }
-        .syna-bubble::-webkit-scrollbar-track { background: transparent; }
-        .syna-bubble::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
-        .syna-bubble:hover::-webkit-scrollbar-thumb,
-        .syna-bubble:active::-webkit-scrollbar-thumb { background: rgba(150,150,150,0.4); }
-      `}</style>
-
       <div className="px-4 pt-6 pb-3" style={{ flexShrink: 0, maxWidth: 720, margin: "0 auto", width: "100%" }}>
         <div className="flex items-center justify-between mb-3">
           <Link
@@ -476,7 +468,7 @@ function SynaChatInner() {
       <div
         className="px-4"
         style={{
-          flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12,
+          flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 20,
           maxWidth: 720, margin: "0 auto", width: "100%",
         }}
       >
@@ -486,68 +478,73 @@ function SynaChatInner() {
           </p>
         )}
 
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className="syna-bubble"
-            style={{
-              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "95%",
-              minWidth: 0,
-              maxHeight: 420,
-              overflowY: "auto",
-              background: m.role === "user" ? "var(--accent)" : "var(--surface-2)",
-              color: m.role === "user" ? "white" : "var(--text)",
-              borderRadius: 14,
-              padding: "12px 16px",
-              overflowWrap: "anywhere",
-              wordBreak: "break-word",
-              scrollbarWidth: "thin",
-            }}
-          >
-            {m.attachment && (
-              m.attachment.type?.startsWith("image/") ? (
-                <img
-                  src={m.attachment.dataUrl}
-                  alt={m.attachment.name}
-                  style={{ maxWidth: "100%", borderRadius: 10, marginBottom: m.text ? 8 : 0, display: "block" }}
-                />
-              ) : (
-                <div
-                  className="flex items-center gap-2"
-                  style={{
-                    background: "rgba(255,255,255,0.12)", borderRadius: 8, padding: "6px 10px",
-                    marginBottom: m.text ? 8 : 0, fontSize: 12,
-                  }}
-                >
-                  <FileIcon size={14} /> {m.attachment.name}
-                </div>
-              )
-            )}
-            {m.role === "assistant" ? (
-              m.text && (
+        {messages.map((m, i) =>
+          m.role === "user" ? (
+            <div
+              key={i}
+              style={{
+                alignSelf: "flex-end",
+                maxWidth: "85%",
+                minWidth: 0,
+                background: "var(--accent)",
+                color: "white",
+                borderRadius: 16,
+                padding: "10px 16px",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            >
+              {m.attachment && (
+                m.attachment.type?.startsWith("image/") ? (
+                  <img
+                    src={m.attachment.dataUrl}
+                    alt={m.attachment.name}
+                    style={{ maxWidth: "100%", borderRadius: 10, marginBottom: m.text ? 8 : 0, display: "block" }}
+                  />
+                ) : (
+                  <div
+                    className="flex items-center gap-2"
+                    style={{
+                      background: "rgba(255,255,255,0.12)", borderRadius: 8, padding: "6px 10px",
+                      marginBottom: m.text ? 8 : 0, fontSize: 12,
+                    }}
+                  >
+                    <FileIcon size={14} /> {m.attachment.name}
+                  </div>
+                )
+              )}
+              {m.text && (
+                <span style={{ fontSize: 14, lineHeight: 1.5, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                  {m.text}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div
+              key={i}
+              style={{
+                alignSelf: "flex-start",
+                width: "100%",
+                minWidth: 0,
+                color: "var(--text)",
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            >
+              {m.text && (
                 <>
                   <MarkdownText text={m.text} />
                   <MessageActions text={m.text} />
                 </>
-              )
-            ) : (
-              m.text && (
-                <span style={{ fontSize: 14, lineHeight: 1.5, overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                  {m.text}
-                </span>
-              )
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          )
+        )}
 
         {loading && (
           <div
             style={{
               alignSelf: "flex-start",
-              background: "var(--surface-2)",
-              borderRadius: 14,
-              padding: "10px 14px",
               display: "flex",
               alignItems: "center",
               gap: 8,
