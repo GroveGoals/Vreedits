@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/requireUser";
 import { getTool, buildPrompt } from "@/lib/aiTools";
 import { callGemini } from "@/lib/gemini";
+import { checkDomainAvailability } from "@/lib/domainCheck";
 
 export async function POST(req) {
   const user = await requireUser();
@@ -27,9 +28,23 @@ export async function POST(req) {
       }
     }
 
+    const enrichedValues = { ...values };
+
+    if (tool.id === "business-name-checker" && values?.name) {
+      const domainResult = await checkDomainAvailability(values.name);
+      if (domainResult) {
+        enrichedValues.domainCheck =
+          domainResult.available === true
+            ? `${domainResult.domain} is currently AVAILABLE (unregistered).`
+            : domainResult.available === false
+            ? `${domainResult.domain} is currently TAKEN (already registered).`
+            : `Could not verify domain availability for ${domainResult.domain} right now.`;
+      }
+    }
+
     let prompt;
     try {
-      prompt = buildPrompt(tool, values);
+      prompt = buildPrompt(tool, enrichedValues);
     } catch {
       return NextResponse.json({ error: "Could not build request." }, { status: 400 });
     }
