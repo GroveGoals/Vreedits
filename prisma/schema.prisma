@@ -450,3 +450,25 @@ model Client {
   createdAt DateTime @default(now())
   notes     Note[]
 }
+model Project {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String? @db.Text
+  status      String  @default("active") // "active" | "completed" | "archived"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks       ProjectTask[]
+}
+
+model ProjectTask {
+  id     String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  status    String  @default("todo") // "todo" | "in_progress" | "done"
+  dueDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
