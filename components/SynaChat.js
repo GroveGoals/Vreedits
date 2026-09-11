@@ -11,6 +11,7 @@ import MarkdownText from "@/components/MarkdownText";
 
 const MAX_ATTACHMENT_BYTES = 4_000_000;
 const MAX_TEXTAREA_HEIGHT = 160;
+const FALLBACK_IMAGE_LIMIT = 5;
 
 function relativeTime(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -145,6 +146,7 @@ function SynaChatInner() {
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [fallbackActive, setFallbackActive] = useState(false);
+  const [fallbackImageCount, setFallbackImageCount] = useState(0);
 
   const [timerEndAt, setTimerEndAt] = useState(null);
   const [timerRemaining, setTimerRemaining] = useState(0);
@@ -165,6 +167,11 @@ function SynaChatInner() {
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT) + "px";
   }, [input]);
+
+  // Once Gemini recovers (fallback turns off), the image count no longer applies.
+  useEffect(() => {
+    if (!fallbackActive) setFallbackImageCount(0);
+  }, [fallbackActive]);
 
   useEffect(() => {
     if (!timerEndAt) return;
@@ -260,6 +267,15 @@ function SynaChatInner() {
     if (!file) return;
     setError("");
 
+    const isImage = file.type?.startsWith("image/");
+    if (isImage && fallbackActive && fallbackImageCount >= FALLBACK_IMAGE_LIMIT) {
+      setError(
+        `You've reached the ${FALLBACK_IMAGE_LIMIT}-image limit while running on backup AI. Wait for Gemini to recover, or keep chatting with text.`
+      );
+      e.target.value = "";
+      return;
+    }
+
     if (file.size > MAX_ATTACHMENT_BYTES) {
       setError("File is too large — please choose one under 4MB.");
       e.target.value = "";
@@ -301,12 +317,25 @@ function SynaChatInner() {
       return;
     }
 
+    const isPendingImage = pendingAttachment?.type?.startsWith("image/");
+
+    if (isPendingImage && fallbackActive && fallbackImageCount >= FALLBACK_IMAGE_LIMIT) {
+      setError(
+        `You've reached the ${FALLBACK_IMAGE_LIMIT}-image limit while running on backup AI. Wait for Gemini to recover, or keep chatting with text.`
+      );
+      return;
+    }
+
     const userMsg = { role: "user", text, attachment: pendingAttachment || undefined };
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
     setInput("");
     setPendingAttachment(null);
     setLoading(true);
+
+    if (isPendingImage && fallbackActive) {
+      setFallbackImageCount((c) => c + 1);
+    }
 
     try {
       const clientDateTime = getUserDateTime();
@@ -356,6 +385,7 @@ function SynaChatInner() {
     setHistoryOpen(false);
     setShareCopied(false);
     setFallbackActive(false);
+    setFallbackImageCount(0);
   }
 
   async function deleteConversation(id, e) {
@@ -415,6 +445,8 @@ function SynaChatInner() {
       setTimeout(() => setShareCopied(false), 2000);
     }
   }
+
+  const imageLimitReached = fallbackActive && fallbackImageCount >= FALLBACK_IMAGE_LIMIT;
 
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "var(--surface)" }}>
@@ -590,13 +622,13 @@ function SynaChatInner() {
       </div>
 
       <div className="px-4 pb-4" style={{ flexShrink: 0, maxWidth: 720, margin: "0 auto", width: "100%" }}>
-        {fallbackActive && (
+        {imageLimitReached && (
           <div
             className="flex items-center gap-2 mb-2 p-2 rounded-xl text-xs"
             style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
           >
             <AlertCircle size={14} style={{ flexShrink: 0 }} />
-            Running on backup AI while Gemini recovers — photos work, but PDFs and other files aren't supported right now.
+            You've reached the {FALLBACK_IMAGE_LIMIT}-image limit while running on backup AI — wait for Gemini to recover to send more photos.
           </div>
         )}
 
@@ -639,30 +671,30 @@ function SynaChatInner() {
               >
                 <button
                   type="button"
-                  onClick={() => galleryInputRef.current?.click()}
+                  onClick={() => !imageLimitReached && galleryInputRef.current?.click()}
+                  disabled={imageLimitReached}
                   className="flex items-center gap-2.5 w-full p-2.5 rounded-lg text-sm"
-                  style={{ textAlign: "left" }}
+                  style={{ textAlign: "left", opacity: imageLimitReached ? 0.5 : 1, cursor: imageLimitReached ? "not-allowed" : "pointer" }}
                 >
                   <ImageIcon size={16} /> Photo from gallery
                 </button>
                 <button
                   type="button"
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={() => !imageLimitReached && cameraInputRef.current?.click()}
+                  disabled={imageLimitReached}
                   className="flex items-center gap-2.5 w-full p-2.5 rounded-lg text-sm"
-                  style={{ textAlign: "left" }}
+                  style={{ textAlign: "left", opacity: imageLimitReached ? 0.5 : 1, cursor: imageLimitReached ? "not-allowed" : "pointer" }}
                 >
                   <Camera size={16} /> Take a photo
                 </button>
-                {!fallbackActive && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2.5 w-full p-2.5 rounded-lg text-sm"
-                    style={{ textAlign: "left" }}
-                  >
-                    <Paperclip size={16} /> Send a file
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2.5 w-full p-2.5 rounded-lg text-sm"
+                  style={{ textAlign: "left" }}
+                >
+                  <Paperclip size={16} /> Send a file
+                </button>
               </div>
             )}
             <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFilePicked} style={{ display: "none" }} />
