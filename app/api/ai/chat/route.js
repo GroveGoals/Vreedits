@@ -13,7 +13,12 @@ const GEMINI_TIMEOUT_MS = 15_000;
 
 function partsForMessage(m) {
   const parts = [];
-  if (m.text) parts.push({ text: m.text });
+  // Defensive: older persisted conversations may contain a message
+  // whose `text` is itself an object (from a pre-fix bug where a full
+  // reply object got saved instead of its text). Unwrap that instead
+  // of sending it to Gemini as-is, which 400s the whole request.
+  const text = typeof m.text === "string" ? m.text : (typeof m.text?.text === "string" ? m.text.text : "");
+  if (text) parts.push({ text });
   if (m.attachment?.dataUrl) {
     const match = m.attachment.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (match) {
