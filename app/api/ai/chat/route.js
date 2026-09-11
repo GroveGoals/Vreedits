@@ -32,10 +32,10 @@ function roleForGemini(role) {
   return role === "assistant" ? "model" : "user";
 }
 
-// Wraps the Gemini call with a timeout and tags rate-limit/timeout
-// failures so the caller knows it's safe to fall back to Cloudflare,
-// as opposed to a genuine bad-request error that retrying elsewhere
-// won't fix.
+// Wraps the Gemini call with a timeout and tags rate-limit/server/timeout
+// failures so the caller knows it's safe to fall back to Cloudflare, as
+// opposed to a genuine bad-request error (e.g. bad model name, malformed
+// content) that retrying elsewhere won't fix.
 async function callGemini(contents, apiKey) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
@@ -54,8 +54,14 @@ async function callGemini(contents, apiKey) {
       }
     );
 
-    if (res.status === 429) {
-      const err = new Error("Gemini rate limited");
+    // 429 (rate limited) and any 5xx (Gemini-side server error, e.g. 503
+    // overloaded) are treated as transient — fall back to Cloudflare.
+    // 4xx other than 429 (bad model name, malformed request, etc.) is a
+    // real bug that falling back won't fix, so it's left to fail loudly.
+    if (res.status === 429 || res.status >= 500) {
+      const detail = await res.text().catch(() => "");
+      console.error(`Gemini error ${res.status} (falling back):`, detail);
+      const err = new Error(res.status === 429 ? "Gemini rate limited" : "Gemini server error");
       err.fallback = true;
       throw err;
     }
@@ -146,8 +152,8 @@ export async function POST(req) {
     });
   } catch (err) {
     if (err.fallback) {
-      // Gemini is rate-limited or timed out — fall back to Cloudflare
-      // Workers AI so Syna can still reply while Gemini recovers.
+      // Gemini is rate-limited, had a server error, or timed out — fall
+      // back to Cloudflare Workers AI so Syna can still reply.
       console.error("Gemini unavailable, falling back to Cloudflare:", err.message);
       try {
         const fallbackText = await generateTextReply(messages, SYNA_SYSTEM_CONTEXT);
