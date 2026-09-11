@@ -8,7 +8,7 @@ import { generateTextReply } from "@/lib/cloudflareText";
 // the database it eventually gets persisted into via /api/ai/conversations.
 const MAX_ATTACHMENT_LENGTH = 5_500_000; // ~4MB actual file
 
-const GEMINI_MODEL = "gemini-3.1-flash-lite";
+const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_TIMEOUT_MS = 15_000;
 
 function partsForMessage(m) {
