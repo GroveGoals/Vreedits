@@ -115,10 +115,10 @@ export async function POST(req) {
   // Image generation branch: if the latest user message reads like a
   // "draw me a..." request, skip the chat model entirely and hand back
   // a generated image instead of a text reply.
-  if (lastMessage.role !== "assistant" && isImageRequest(lastMessage.text)) {
-    try {
-      const dataUrl = await generateImage(lastMessage.text);
-      return NextResponse.json({
+  if (lastMessage.role !== "assistant" && (isImageRequest(lastMessage.text) || lastMessage.attachment?.type?.startsWith("image/"))) {
+  try {
+    const dataUrl = await generateImage(lastMessage.text, lastMessage.attachment?.dataUrl);
+  return NextResponse.json({
         reply: {
           role: "assistant",
           text: "Here's what I generated:",
