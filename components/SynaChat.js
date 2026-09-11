@@ -322,7 +322,13 @@ function SynaChatInner() {
         return;
       }
 
-      const finalMessages = [...nextMessages, { role: "assistant", text: data.reply }];
+      // NOTE: the API returns `reply` as a full message object
+      // ({ role, text, attachment? }), not a plain string — so it
+      // gets spread in directly rather than wrapped in a new object.
+      // Wrapping it (e.g. `{ role: "assistant", text: data.reply }`)
+      // put the whole object into `text`, which crashed ReactMarkdown
+      // when it tried to render a non-string child.
+      const finalMessages = [...nextMessages, data.reply];
       setMessages(finalMessages);
       persist(finalMessages);
     } catch {
@@ -531,6 +537,25 @@ function SynaChatInner() {
                 wordBreak: "break-word",
               }}
             >
+              {m.attachment?.dataUrl && (
+                m.attachment.type?.startsWith("image/") !== false ? (
+                  <img
+                    src={m.attachment.dataUrl}
+                    alt={m.attachment.name || "Generated image"}
+                    style={{ maxWidth: "100%", borderRadius: 10, marginBottom: m.text ? 8 : 0, display: "block" }}
+                  />
+                ) : (
+                  <div
+                    className="flex items-center gap-2"
+                    style={{
+                      background: "var(--surface-2)", borderRadius: 8, padding: "6px 10px",
+                      marginBottom: m.text ? 8 : 0, fontSize: 12,
+                    }}
+                  >
+                    <FileIcon size={14} /> {m.attachment.name}
+                  </div>
+                )
+              )}
               {m.text && (
                 <>
                   <MarkdownText text={m.text} />
