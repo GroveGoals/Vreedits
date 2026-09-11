@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/requireUser";
 import { SYNA_SYSTEM_CONTEXT } from "@/lib/synaContext";
 import { generateImage, isImageRequest } from "@/lib/cloudflareImage";
+import { generateTextReply } from "@/lib/cloudflareText";
 
 // Cap attached file size (base64) so one image can't bloat a request or
 // the database it eventually gets persisted into via /api/ai/conversations.
 const MAX_ATTACHMENT_LENGTH = 5_500_000; // ~4MB actual file
 
 const GEMINI_MODEL = "gemini-1.5-flash";
+const GEMINI_TIMEOUT_MS = 15_000;
 
 function partsForMessage(m) {
   const parts = [];
@@ -23,6 +25,63 @@ function partsForMessage(m) {
 
 function roleForGemini(role) {
   return role === "assistant" ? "model" : "user";
+}
+
+// Wraps the Gemini call with a timeout and tags rate-limit/timeout
+// failures so the caller knows it's safe to fall back to Cloudflare,
+// as opposed to a genuine bad-request error that retrying elsewhere
+// won't fix.
+async function callGemini(contents, apiKey) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          systemInstruction: { parts: [{ text: SYNA_SYSTEM_CONTEXT }] },
+        }),
+        signal: controller.signal,
+      }
+    );
+
+    if (res.status === 429) {
+      const err = new Error("Gemini rate limited");
+      err.fallback = true;
+      throw err;
+    }
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error(`Gemini error ${res.status}:`, detail);
+      const err = new Error("Gemini request failed");
+      err.status = res.status;
+      throw err;
+    }
+
+    const data = await res.json();
+    const replyText = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+
+    if (!replyText) {
+      const err = new Error("Gemini returned no text");
+      throw err;
+    }
+
+    return replyText;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      const timeoutErr = new Error("Gemini timed out");
+      timeoutErr.fallback = true;
+      throw timeoutErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function POST(req) {
@@ -76,33 +135,29 @@ export async function POST(req) {
   }));
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          systemInstruction: { parts: [{ text: SYNA_SYSTEM_CONTEXT }] },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error(`Gemini error ${res.status}:`, detail);
-      return NextResponse.json({ error: "Syna couldn't respond right now. Please try again." }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const replyText = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-
-    if (!replyText) {
-      return NextResponse.json({ error: "Syna didn't return a response. Please try again." }, { status: 502 });
-    }
-
-    return NextResponse.json({ reply: { role: "assistant", text: replyText } });
+    const replyText = await callGemini(contents, apiKey);
+    return NextResponse.json({
+      reply: { role: "assistant", text: replyText, usedFallback: false },
+    });
   } catch (err) {
+    if (err.fallback) {
+      // Gemini is rate-limited or timed out — fall back to Cloudflare
+      // Workers AI so Syna can still reply while Gemini recovers.
+      console.error("Gemini unavailable, falling back to Cloudflare:", err.message);
+      try {
+        const fallbackText = await generateTextReply(messages, SYNA_SYSTEM_CONTEXT);
+        return NextResponse.json({
+          reply: { role: "assistant", text: fallbackText, usedFallback: true },
+        });
+      } catch (fallbackErr) {
+        console.error("Cloudflare fallback also failed:", fallbackErr);
+        return NextResponse.json(
+          { error: "Syna couldn't respond right now. Please try again." },
+          { status: 502 }
+        );
+      }
+    }
+
     console.error("POST /api/ai/chat error:", err);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
