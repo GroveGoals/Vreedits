@@ -596,7 +596,7 @@ function SynaChatInner() {
             style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
           >
             <AlertCircle size={14} style={{ flexShrink: 0 }} />
-            Running on backup AI while Gemini recovers — text only, attachments are disabled for now.
+            Running on backup AI while Gemini recovers — photos work, but PDFs and other files aren't supported right now.
           </div>
         )}
 
@@ -625,17 +625,10 @@ function SynaChatInner() {
           <div style={{ position: "relative" }}>
             <button
               type="button"
-              onClick={() => !fallbackActive && setAttachMenuOpen((v) => !v)}
-              disabled={fallbackActive}
+              onClick={() => setAttachMenuOpen((v) => !v)}
               className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{
-                background: "var(--surface-2)",
-                color: "var(--text)",
-                opacity: fallbackActive ? 0.5 : 1,
-                cursor: fallbackActive ? "not-allowed" : "pointer",
-              }}
+              style={{ background: "var(--surface-2)", color: "var(--text)" }}
               aria-label="Attach"
-              title={fallbackActive ? "Attachments are unavailable while running on backup AI" : undefined}
             >
               <Plus size={18} />
             </button>
@@ -660,14 +653,16 @@ function SynaChatInner() {
                 >
                   <Camera size={16} /> Take a photo
                 </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2.5 w-full p-2.5 rounded-lg text-sm"
-                  style={{ textAlign: "left" }}
-                >
-                  <Paperclip size={16} /> Send a file
-                </button>
+                {!fallbackActive && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2.5 w-full p-2.5 rounded-lg text-sm"
+                    style={{ textAlign: "left" }}
+                  >
+                    <Paperclip size={16} /> Send a file
+                  </button>
+                )}
               </div>
             )}
             <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFilePicked} style={{ display: "none" }} />
