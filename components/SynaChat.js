@@ -144,6 +144,7 @@ function SynaChatInner() {
   const [shareCopied, setShareCopied] = useState(false);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
+  const [fallbackActive, setFallbackActive] = useState(false);
 
   const [timerEndAt, setTimerEndAt] = useState(null);
   const [timerRemaining, setTimerRemaining] = useState(0);
@@ -322,6 +323,8 @@ function SynaChatInner() {
         return;
       }
 
+      setFallbackActive(!!data.reply?.usedFallback);
+
       // NOTE: the API returns `reply` as a full message object
       // ({ role, text, attachment? }), not a plain string — so it
       // gets spread in directly rather than wrapped in a new object.
@@ -352,6 +355,7 @@ function SynaChatInner() {
     setPendingAttachment(null);
     setHistoryOpen(false);
     setShareCopied(false);
+    setFallbackActive(false);
   }
 
   async function deleteConversation(id, e) {
@@ -586,6 +590,16 @@ function SynaChatInner() {
       </div>
 
       <div className="px-4 pb-4" style={{ flexShrink: 0, maxWidth: 720, margin: "0 auto", width: "100%" }}>
+        {fallbackActive && (
+          <div
+            className="flex items-center gap-2 mb-2 p-2 rounded-xl text-xs"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
+          >
+            <AlertCircle size={14} style={{ flexShrink: 0 }} />
+            Running on backup AI while Gemini recovers — text only, attachments are disabled for now.
+          </div>
+        )}
+
         {pendingAttachment && (
           <div
             className="flex items-center justify-between mb-2 p-2 rounded-xl"
@@ -611,10 +625,17 @@ function SynaChatInner() {
           <div style={{ position: "relative" }}>
             <button
               type="button"
-              onClick={() => setAttachMenuOpen((v) => !v)}
+              onClick={() => !fallbackActive && setAttachMenuOpen((v) => !v)}
+              disabled={fallbackActive}
               className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "var(--surface-2)", color: "var(--text)" }}
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text)",
+                opacity: fallbackActive ? 0.5 : 1,
+                cursor: fallbackActive ? "not-allowed" : "pointer",
+              }}
               aria-label="Attach"
+              title={fallbackActive ? "Attachments are unavailable while running on backup AI" : undefined}
             >
               <Plus size={18} />
             </button>
